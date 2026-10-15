@@ -1,6 +1,10 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <link rel="manifest" href="{% static 'assistant/manifest.json' %}">
+    <meta name="theme-color" content="#5d9b3a">
+    <link rel="apple-touch-icon" href="{% static 'assistant/icons/icon-192.png' %}">
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
@@ -100,9 +104,15 @@
 @keyframes fall {
     to { transform: translate(70px, 105vh) rotate(200deg); }
 }
-@media (max-width: 1100px) {
+@media (max-width: 900px) {
     .scene, .petal { display: none; }
 }
+.offline-banner {
+    display: none; padding: 8px 12px; text-align: center;
+    background: #a33a3a; color: #fff;
+    font-family: "Press Start 2P", monospace; font-size: 8px; line-height: 1.5;
+}
+.offline-banner.show { display: block; }
 </style>
 </head>
 <body>
@@ -170,6 +180,7 @@
 <i class="petal" style="left:82%;animation-duration:14s;animation-delay:-2s"></i>
 <i class="petal" style="left:92%;animation-duration:10s;animation-delay:-5s"></i>
     <div class="app">
+        <div id="offlineBanner" class="offline-banner">⚠ You're offline. The AI can't reply until you reconnect.</div>
         <div class="header">⛏ AI ASSISTANT</div>
 
         <div id="chat" class="chat">
@@ -201,7 +212,7 @@
     const clearBtn = document.getElementById("clearBtn");
     const csrf = document.querySelector("[name=csrfmiddlewaretoken]").value;
     let chatHistory = [];
-
+    const greetingHTML = chat.innerHTML;
     function addMessage(text, who) {
         const label = document.createElement("div");
         label.className = who === "user" ? "label user-label" : "label";
@@ -220,6 +231,10 @@
     async function sendMessage(text) {
     text = text.trim();
     if (!text) return;
+    if (!navigator.onLine) {
+    addMessage("You're offline, so I can't reach the AI right now. Try again when you're back online.", "bot");
+    return;
+}
 
     addMessage(text, "user");
     promptBox.value = "";
@@ -263,7 +278,7 @@
     });
 
     clearBtn.addEventListener("click", () => {
-    chat.innerHTML = "";
+    chat.innerHTML = greetingHTML;
     promptBox.value = "";
     chatHistory = [];
 });
@@ -275,6 +290,18 @@
             sendMessage(chip.textContent + context);
         });
     });
+    if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/service-worker.js", { scope: "/" });
+    });
+}
+const offlineBanner = document.getElementById("offlineBanner");
+function updateOnlineStatus() {
+    offlineBanner.classList.toggle("show", !navigator.onLine);
+}
+window.addEventListener("online", updateOnlineStatus);
+window.addEventListener("offline", updateOnlineStatus);
+updateOnlineStatus();
 </script>
 </body>
 </html>

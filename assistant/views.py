@@ -1,4 +1,4 @@
-import json, os
+import json, os, time
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_POST
@@ -15,6 +15,9 @@ client = genai.Client(
 def index(request):
     return render(request, "assistant/index.html")
 
+def service_worker(request):
+    return render(request, "assistant/service-worker.js", content_type="application/javascript")
+
 @require_POST
 def ask(request):
     data = json.loads(request.body)
@@ -29,6 +32,7 @@ def ask(request):
         contents.append({"role": role, "parts": [{"text": m.get("text", "")}]})
     contents.append({"role": "user", "parts": [{"text": prompt}]})
 
+    busy = False
     models = ["gemini-3.5-flash-lite", "gemini-3.8-flash"]
     for model in models:
         for attempt in range(2):
@@ -41,7 +45,11 @@ def ask(request):
             except Exception as e:
                 print("GEMINI ERROR:", model, repr(e))
                 if "503" in str(e) or "429" in str(e):
+                    busy = True
                     time.sleep(1.5)
                     continue
                 break
-    return JsonResponse({"error": "The AI is busy right now, try again in a bit."}, status=503)
+
+    if busy:
+        return JsonResponse({"error": "The AI is busy right now, try again in a bit."}, status=503)
+    return JsonResponse({"error": "I couldn't reach the AI. Check your internet connection and try again."}, status=502)
